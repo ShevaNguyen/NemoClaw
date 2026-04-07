@@ -266,6 +266,7 @@ harden_openclaw_symlinks() {
   fi
 }
 
+# Write an auth profile JSON for the NVIDIA API key so the gateway can authenticate.
 write_auth_profile() {
   if [ -z "${NVIDIA_API_KEY:-}" ]; then
     return
@@ -307,6 +308,7 @@ configure_messaging_channels() {
   return 0
 }
 
+# Print the local and remote dashboard URLs, appending the auth token if available.
 print_dashboard_urls() {
   local token chat_ui_base local_url remote_url
 
@@ -407,7 +409,8 @@ while time.time() < DEADLINE:
 else:
     print(f'[auto-pair] watcher timed out approvals={APPROVED}')
 PYAUTOPAIR
-  echo "[gateway] auto-pair watcher launched (pid $!)" >&2
+  AUTO_PAIR_PID=$!
+  echo "[gateway] auto-pair watcher launched (pid $AUTO_PAIR_PID)" >&2
 }
 
 # ── Proxy environment ────────────────────────────────────────────
@@ -486,6 +489,22 @@ if [ -w "$_SANDBOX_HOME" ]; then
   _write_proxy_snippet "${_SANDBOX_HOME}/.profile"
 fi
 
+# Forward SIGTERM/SIGINT to child processes for graceful shutdown.
+# This script is PID 1 — without a trap, signals interrupt wait and
+# children are orphaned until Docker sends SIGKILL after the grace period.
+cleanup() {
+  echo "[gateway] received signal, forwarding to children..." >&2
+  local gateway_status=0
+  kill -TERM "$GATEWAY_PID" 2>/dev/null || true
+  if [ -n "${AUTO_PAIR_PID:-}" ]; then
+    kill -TERM "$AUTO_PAIR_PID" 2>/dev/null || true
+  fi
+  wait "$GATEWAY_PID" 2>/dev/null || gateway_status=$?
+  if [ -n "${AUTO_PAIR_PID:-}" ]; then
+    wait "$AUTO_PAIR_PID" 2>/dev/null || true
+  fi
+  exit "$gateway_status"
+}
 # ── Main ─────────────────────────────────────────────────────────
 
 echo 'Setting up NemoClaw...' >&2
@@ -526,8 +545,10 @@ if [ "$(id -u)" -ne 0 ]; then
   nohup "$OPENCLAW" gateway run >/tmp/gateway.log 2>&1 &
   GATEWAY_PID=$!
   echo "[gateway] openclaw gateway launched (pid $GATEWAY_PID)" >&2
+  trap cleanup SIGTERM SIGINT
   start_auto_pair
   print_dashboard_urls
+
   wait "$GATEWAY_PID"
   exit $?
 fi
@@ -580,6 +601,7 @@ harden_openclaw_symlinks
 nohup gosu gateway "$OPENCLAW" gateway run >/tmp/gateway.log 2>&1 &
 GATEWAY_PID=$!
 echo "[gateway] openclaw gateway launched as 'gateway' user (pid $GATEWAY_PID)" >&2
+trap cleanup SIGTERM SIGINT
 
 start_auto_pair
 print_dashboard_urls
