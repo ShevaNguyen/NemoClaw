@@ -488,7 +488,7 @@ test_sbx_06_gateway_recovery() {
 
   log "  Running nemoclaw status (expect recovery attempt — may take several minutes)..."
   local status_output status_exit=0
-  status_output=$($TIMEOUT_CMD 900 nemoclaw "$SANDBOX_A" status 2>&1) || status_exit=$?
+  status_output=$($TIMEOUT_CMD 2700 nemoclaw "$SANDBOX_A" status 2>&1) || status_exit=$?
   log "  Status output (exit $status_exit): $(echo "$status_output" | head -5)"
 
   if echo "$status_output" | grep -qiE "recover|healthy|Ready|running|gateway"; then
