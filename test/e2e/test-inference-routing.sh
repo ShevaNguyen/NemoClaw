@@ -193,23 +193,24 @@ test_inf_05_credential_isolation() {
     return
   fi
 
-  # Need a running sandbox — check if one exists, onboard if not
-  if ! nemoclaw list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
-    log "  Onboarding sandbox '$SANDBOX_NAME' for credential test..."
-    rm -f "$HOME/.nemoclaw/onboard.lock" 2>/dev/null || true
-    local onboard_exit=0
-    NEMOCLAW_SANDBOX_NAME="$SANDBOX_NAME" \
-      NEMOCLAW_NON_INTERACTIVE=1 \
-      NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
-      NEMOCLAW_POLICY_TIER="open" \
-      nemoclaw onboard --non-interactive --yes-i-accept-third-party-software \
-      2>&1 | tee -a "$LOG_FILE" || onboard_exit=$?
-    if [[ $onboard_exit -ne 0 ]]; then
-      fail "TC-INF-05: Setup" "Onboard failed (exit $onboard_exit)"
-      return
-    fi
-  else
-    log "  Using existing sandbox '$SANDBOX_NAME'"
+  # Always recreate to avoid stale state hiding credential plumbing regressions
+  if nemoclaw list 2>/dev/null | grep -q "$SANDBOX_NAME"; then
+    log "  Removing existing sandbox '$SANDBOX_NAME' to avoid stale state..."
+    nemoclaw "$SANDBOX_NAME" destroy --yes 2>/dev/null || true
+  fi
+
+  log "  Onboarding sandbox '$SANDBOX_NAME' for credential test..."
+  rm -f "$HOME/.nemoclaw/onboard.lock" 2>/dev/null || true
+  local onboard_exit=0
+  NEMOCLAW_SANDBOX_NAME="$SANDBOX_NAME" \
+    NEMOCLAW_NON_INTERACTIVE=1 \
+    NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
+    NEMOCLAW_POLICY_TIER="open" \
+    nemoclaw onboard --non-interactive --yes-i-accept-third-party-software \
+    2>&1 | sed "s/${real_key}/REDACTED/g" | tee -a "$LOG_FILE" || onboard_exit=$?
+  if [[ $onboard_exit -ne 0 ]]; then
+    fail "TC-INF-05: Setup" "Onboard failed (exit $onboard_exit)"
+    return
   fi
 
   # Capture sandbox environment and process list once
@@ -358,14 +359,14 @@ test_inf_07_unreachable_endpoint() {
 
   rm -f "$HOME/.nemoclaw/onboard.lock" 2>/dev/null || true
 
-  # Use a non-routable IP as the endpoint — guaranteed to timeout
+  # Use an RFC 2606 invalid domain — deterministic DNS failure across runners
   local output exit_code=0
   output=$(NVIDIA_API_KEY="nvapi-valid-format-but-fake-key-1234567890" \
     NEMOCLAW_NON_INTERACTIVE=1 \
     NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
     NEMOCLAW_SANDBOX_NAME="e2e-unreachable" \
     NEMOCLAW_PROVIDER="compatible-endpoint" \
-    NEMOCLAW_COMPATIBLE_ENDPOINT_URL="https://10.255.255.1:9999/v1" \
+    NEMOCLAW_COMPATIBLE_ENDPOINT_URL="https://nemoclaw-e2e.invalid/v1" \
     NEMOCLAW_COMPATIBLE_ENDPOINT_MODEL="test-model" \
     COMPATIBLE_API_KEY="fake-key-for-unreachable-test" \
     $TIMEOUT_CMD 120 nemoclaw onboard --non-interactive --yes-i-accept-third-party-software \
@@ -379,7 +380,7 @@ test_inf_07_unreachable_endpoint() {
   pass "TC-INF-07: Onboard failed as expected (exit $exit_code)"
 
   # 2. Output should contain transport/connection error keywords
-  if echo "$output" | grep -qiE "unreachable|timeout|connect|ECONNREFUSED|ETIMEDOUT|transport|network|endpoint"; then
+  if echo "$output" | grep -qiE "unreachable|timeout|connect|ECONNREFUSED|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ENOTFOUND|EAI_AGAIN|No route to host|transport|network|endpoint|dns"; then
     pass "TC-INF-07: Output contains transport error classification"
   else
     fail "TC-INF-07: Error classification" "No transport error keyword found"
