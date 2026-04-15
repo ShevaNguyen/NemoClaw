@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Manual trigger for inference routing E2E test on fork.
+# Usage: Go to Actions tab → "Test Inference Routing" → Run workflow
+
+name: Test Inference Routing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inference-routing-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run inference routing E2E test
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+          NEMOCLAW_POLICY_TIER: "open"
+        run: bash test/e2e/test-inference-routing.sh
+
+      - name: Upload test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inference-routing-test-log
+          path: test-inference-routing-*.log
+          if-no-files-found: ignore
