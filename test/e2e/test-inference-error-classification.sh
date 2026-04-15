@@ -222,8 +222,8 @@ test_inf_05_credential_isolation() {
   fi
 
   log "  Capturing sandbox process list..."
-  local sandbox_ps
-  sandbox_ps=$(sandbox_exec "ps aux 2>/dev/null || ps -ef 2>/dev/null") || true
+  local sandbox_ps ps_exit=0
+  sandbox_ps=$(sandbox_exec "ps aux 2>/dev/null || ps -ef 2>/dev/null") || ps_exit=$?
 
   # TC-INF-05a: Real API key not in environment variables
   if echo "$sandbox_env" | grep -qF "$real_key"; then
@@ -233,7 +233,11 @@ test_inf_05_credential_isolation() {
   fi
 
   # TC-INF-05b: Real API key not in process list
-  if [[ -n "$sandbox_ps" ]] && echo "$sandbox_ps" | grep -qF "$real_key"; then
+  if [[ $ps_exit -ne 0 || -z "$sandbox_ps" ]]; then
+    fail "TC-INF-05b: Setup" "Could not capture sandbox process list (SSH failure)"
+    return
+  fi
+  if echo "$sandbox_ps" | grep -qF "$real_key"; then
     fail "TC-INF-05b: Process list" "Real API key found in sandbox process list"
   else
     pass "TC-INF-05b: Real API key absent from sandbox process list"
