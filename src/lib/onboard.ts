@@ -138,7 +138,7 @@ function verifyGatewayContainerRunning() {
     `docker inspect --type container --format '{{.State.Running}}' ${containerName}`,
     { ignoreError: true, suppressOutput: true },
   );
-  if (result.status === 0 && (result.stdout || "").trim() === "true") {
+  if (result.status === 0 && String(result.stdout || "").trim() === "true") {
     return "running";
   }
   // Container exists but is stopped (exit 0, Running !== "true")
