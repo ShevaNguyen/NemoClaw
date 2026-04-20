@@ -18,7 +18,6 @@ jobs:
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NEMOCLAW_NON_INTERACTIVE: "1"
           NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
-          SKIP_UNINSTALL: "1"
         run: bash test/e2e/test-deployment-services.sh
 
       - name: Upload test log on failure
