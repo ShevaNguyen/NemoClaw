@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+name: test-diagnostics-manual
+on:
+  workflow_dispatch:
+jobs:
+  diagnostics-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run diagnostics E2E test
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: bash test/e2e/test-diagnostics.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostics-test-log
+          path: test-diagnostics-*.log
+          if-no-files-found: ignore
