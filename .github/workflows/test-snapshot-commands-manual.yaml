@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+name: test-snapshot-commands-manual
+on:
+  workflow_dispatch:
+jobs:
+  snapshot-commands-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run snapshot commands E2E test
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+          NEMOCLAW_SANDBOX_NAME: "e2e-snapshot"
+        run: bash test/e2e/test-snapshot-commands.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-commands-test-log
+          path: test-snapshot-commands-*.log
+          if-no-files-found: ignore
