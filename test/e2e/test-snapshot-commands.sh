@@ -101,8 +101,13 @@ pass "Marker file written"
 # ── Phase 3: snapshot create ────────────────────────────────────────
 info "Phase 3: Creating snapshot..."
 
-SNAPSHOT_OUTPUT=$(nemoclaw "${SANDBOX_NAME}" snapshot create 2>&1)
+SNAPSHOT_EXIT=0
+SNAPSHOT_OUTPUT=$(nemoclaw "${SANDBOX_NAME}" snapshot create 2>&1) || SNAPSHOT_EXIT=$?
 echo "$SNAPSHOT_OUTPUT"
+
+if [ "$SNAPSHOT_EXIT" -ne 0 ]; then
+  fail "snapshot create exited ${SNAPSHOT_EXIT}: ${SNAPSHOT_OUTPUT}"
+fi
 
 if echo "$SNAPSHOT_OUTPUT" | grep -q "Snapshot created"; then
   pass "snapshot create succeeded"
@@ -142,7 +147,10 @@ openshell sandbox exec --name "${SANDBOX_NAME}" -- \
 GONE=$(openshell sandbox exec --name "${SANDBOX_NAME}" -- cat "${MARKER_FILE}" 2>/dev/null || echo "GONE")
 [ "$GONE" = "GONE" ] || fail "First marker should be deleted but got: ${GONE}"
 
-nemoclaw "${SANDBOX_NAME}" snapshot create >/dev/null 2>&1 || fail "Second snapshot create failed"
+SECOND_SNAP_OUTPUT=$(nemoclaw "${SANDBOX_NAME}" snapshot create 2>&1) || {
+  echo "$SECOND_SNAP_OUTPUT"
+  fail "Second snapshot create failed: ${SECOND_SNAP_OUTPUT}"
+}
 pass "State modified, second snapshot created"
 
 # Perturb workspace so restore has to do real work
@@ -153,8 +161,13 @@ openshell sandbox exec --name "${SANDBOX_NAME}" -- \
 # ── Phase 6: snapshot restore (latest) ──────────────────────────────
 info "Phase 6: Restoring latest snapshot..."
 
-RESTORE_OUTPUT=$(nemoclaw "${SANDBOX_NAME}" snapshot restore 2>&1)
+RESTORE_EXIT=0
+RESTORE_OUTPUT=$(nemoclaw "${SANDBOX_NAME}" snapshot restore 2>&1) || RESTORE_EXIT=$?
 echo "$RESTORE_OUTPUT"
+
+if [ "$RESTORE_EXIT" -ne 0 ]; then
+  fail "snapshot restore exited ${RESTORE_EXIT}: ${RESTORE_OUTPUT}"
+fi
 
 if ! echo "$RESTORE_OUTPUT" | grep -q "Restored"; then
   fail "snapshot restore failed: ${RESTORE_OUTPUT}"
@@ -167,8 +180,13 @@ pass "Latest snapshot restored expected state"
 # ── Phase 7: snapshot restore with timestamp (first snapshot) ───────
 info "Phase 7: Restoring first snapshot by timestamp..."
 
-TARGETED_OUTPUT=$(nemoclaw "${SANDBOX_NAME}" snapshot restore "${SNAPSHOT_TIMESTAMP}" 2>&1)
+TARGETED_EXIT=0
+TARGETED_OUTPUT=$(nemoclaw "${SANDBOX_NAME}" snapshot restore "${SNAPSHOT_TIMESTAMP}" 2>&1) || TARGETED_EXIT=$?
 echo "$TARGETED_OUTPUT"
+
+if [ "$TARGETED_EXIT" -ne 0 ]; then
+  fail "Targeted snapshot restore exited ${TARGETED_EXIT}: ${TARGETED_OUTPUT}"
+fi
 
 if ! echo "$TARGETED_OUTPUT" | grep -q "Restored"; then
   fail "Targeted snapshot restore failed: ${TARGETED_OUTPUT}"

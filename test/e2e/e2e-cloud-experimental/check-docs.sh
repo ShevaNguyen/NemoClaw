@@ -150,17 +150,12 @@ run_cli_check() {
     if (/^\s*nemoclaw\s+(.+)/) {
       my $c = $1;
       $c =~ s/\s{2,}.*$//;
-      # Strip single-space-separated descriptions (uppercase start after arg)
-      $c =~ s/\s+[A-Z][a-z].*$//;
       $c =~ s/\s+$//;
       $c =~ s/\s*\[[^\]]*\]\s*$//;
       $c =~ s/\s*--output\s+FILE\s*$//;
       while ($c =~ s/\s+<[^>]+>\s*$//) {}
       my $k = "nemoclaw $c";
       $k =~ s/^nemoclaw debug.*/nemoclaw debug/;
-      # Skip deprecated aliases and flag variants not in commands.md
-      next if $k eq "nemoclaw setup";
-      next if $k =~ /\s--from$/;
       print "$k\n";
     }
   ' | LC_ALL=C sort -u >"$_tmp/help.txt"
@@ -174,15 +169,7 @@ run_cli_check() {
   log '[cli] phase 2/2: extract ### `nemoclaw …` headings from commands reference'
   # Allow optional MyST suffix on the same line, e.g. ### `nemoclaw onboard` {#anchor}
   grep -E '^### `nemoclaw ' "$COMMANDS_MD" | LC_ALL=C perl -CS -ne '
-    if (/^### `([^`]+)`\s*(?:\{[^}]+\})?\s*$/) {
-      my $c = $1;
-      $c =~ s/\s{2,}.*$//;
-      $c =~ s/\s+$//;
-      $c =~ s/\s*\[[^\]]*\]\s*$//;
-      $c =~ s/\s*--output\s+FILE\s*$//;
-      while ($c =~ s/\s+<[^>]+>\s*$//) {}
-      print "$c\n";
-    }
+    if (/^### `([^`]+)`\s*(?:\{[^}]+\})?\s*$/) { print "$1\n"; }
   ' | LC_ALL=C sort -u >"$_tmp/doc.txt"
 
   local _n_doc
