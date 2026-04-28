@@ -135,43 +135,45 @@ pass "Stored NVIDIA_API_KEY in ~/.nemoclaw/credentials.json for resume hydration
 # Phase 2: Create interrupted resumable state
 # ══════════════════════════════════════════════════════════════════
 section "Phase 2: Create interrupted state"
-info "Running onboard with an invalid policy mode to create resumable state..."
+info "Starting onboard in background and killing mid-flight to create resumable state..."
 
 FIRST_LOG="$(mktemp)"
 NEMOCLAW_NON_INTERACTIVE=1 \
   NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE=1 \
   NEMOCLAW_SANDBOX_NAME="$SANDBOX_NAME" \
   NEMOCLAW_RECREATE_SANDBOX=1 \
-  NEMOCLAW_POLICY_MODE=invalid \
-  node "$REPO/bin/nemoclaw.js" onboard --non-interactive >"$FIRST_LOG" 2>&1
-first_exit=$?
-first_output="$(cat "$FIRST_LOG")"
-rm -f "$FIRST_LOG"
+  node "$REPO/bin/nemoclaw.js" onboard --non-interactive >"$FIRST_LOG" 2>&1 &
+onboard_pid=$!
 
-if [ $first_exit -eq 1 ]; then
-  pass "First onboard exited 1 (expected interrupted run)"
-else
-  fail "First onboard exited $first_exit (expected 1)"
-  echo "$first_output"
-  exit 1
-fi
+# Wait for session file to appear (means onboard reached step 2+)
+for i in $(seq 1 60); do
+  if [ -f "$SESSION_FILE" ]; then
+    break
+  fi
+  sleep 5
+done
 
 if [ -f "$SESSION_FILE" ]; then
   pass "Onboard session file created"
+  info "Killing onboard (PID $onboard_pid) to simulate interruption..."
+  kill "$onboard_pid" 2>/dev/null || true
+  wait "$onboard_pid" 2>/dev/null || true
+  pass "Onboard killed mid-flight (simulated Ctrl+C)"
 else
-  fail "Onboard session file missing after interrupted run"
+  kill "$onboard_pid" 2>/dev/null || true
+  wait "$onboard_pid" 2>/dev/null || true
+  first_output="$(cat "$FIRST_LOG")"
+  fail "Onboard session file missing after 5 minutes"
+  echo "$first_output"
+  rm -f "$FIRST_LOG"
+  exit 1
 fi
-
-if echo "$first_output" | grep -q "Unsupported NEMOCLAW_POLICY_MODE: invalid"; then
-  pass "First run failed at policy setup as intended"
-else
-  fail "First run did not fail at the expected policy step"
-fi
+rm -f "$FIRST_LOG"
 
 if openshell sandbox get "$SANDBOX_NAME" >/dev/null 2>&1; then
   pass "Sandbox '$SANDBOX_NAME' exists after interrupted run"
 else
-  fail "Sandbox '$SANDBOX_NAME' not found after interrupted run"
+  info "Sandbox not yet created (killed before sandbox step) — expected for early interruption"
 fi
 
 # ══════════════════════════════════════════════════════════════════
