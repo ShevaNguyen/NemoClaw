@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+name: test-cloud-experimental-manual
+on:
+  workflow_dispatch:
+jobs:
+  cloud-experimental-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run cloud-experimental E2E test
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_E2E_CLOUD_EXPERIMENTAL_INTERACTIVE_INSTALL: "0"
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+          NEMOCLAW_RECREATE_SANDBOX: "1"
+          NEMOCLAW_POLICY_MODE: "custom"
+          NEMOCLAW_POLICY_PRESETS: "npm,pypi"
+          RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_CHECK_DOCS: "1"
+          RUN_E2E_CLOUD_EXPERIMENTAL_SKIP_FINAL_CLEANUP: "1"
+        run: bash test/e2e/test-e2e-cloud-experimental.sh
+      - name: Tear down sandbox
+        if: always()
+        env:
+          SANDBOX_NAME: e2e-cloud-experimental
+          NEMOCLAW_SANDBOX_NAME: e2e-cloud-experimental
+        run: |
+          set -euo pipefail
+          [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
+          export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+          bash test/e2e/e2e-cloud-experimental/cleanup.sh --verify
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-log-cloud-experimental
+          path: /tmp/nemoclaw-e2e-cloud-experimental-install.log
+          if-no-files-found: ignore
