@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 
 import { describe, it } from "vitest";
 
+/** Parse JSON from a child process stdout, stripping any non-JSON prefix. */
 function parseStdoutJson<T>(stdout: string): T {
   const line = stdout.trim().split("\n").pop();
   if (!line) {
@@ -54,6 +55,13 @@ runner.runCapture = (command) => {
   return "";
 };
 runner.run = () => ({ status: 0, stdout: "", stderr: "" });
+
+const origSpawnSync = childProcess.spawnSync;
+childProcess.spawnSync = (...args) => {
+  if (args[0] === "curl") return { status: 0, stdout: "", stderr: "" };
+  if (args[0] === "sleep") return { status: 0, stdout: "", stderr: "" };
+  return origSpawnSync(...args);
+};
 
 const stateDir = path.join(process.env.HOME, ".nemoclaw");
 fs.mkdirSync(stateDir, { recursive: true });
@@ -130,6 +138,12 @@ runner.runCapture = (command) => {
   return "";
 };
 runner.run = () => ({ status: 0, stdout: "", stderr: "" });
+
+const origSpawnSync = childProcess.spawnSync;
+childProcess.spawnSync = (...args) => {
+  if (args[0] === "curl") return { status: 0, stdout: "", stderr: "" };
+  return origSpawnSync(...args);
+};
 
 const stateDir = path.join(process.env.HOME, ".nemoclaw");
 fs.mkdirSync(stateDir, { recursive: true });

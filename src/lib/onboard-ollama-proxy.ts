@@ -166,8 +166,26 @@ function startOllamaAuthProxy(): boolean {
 }
 
 /**
- * Ensure the auth proxy is running — called on sandbox connect to recover
- * from host reboots where the background proxy process was lost.
+ * Probe the running proxy to confirm it accepts the given token.
+ * Returns true if the proxy responds to an authenticated request.
+ */
+function isProxyTokenValid(token: string): boolean {
+  const result = spawnSync("curl", [
+    "-sf",
+    "--max-time",
+    "3",
+    "-H",
+    `Authorization: Bearer ${token}`,
+    `http://localhost:${OLLAMA_PROXY_PORT}/v1/models`,
+  ], { encoding: "utf8" });
+  return result.status === 0;
+}
+
+/**
+ * Ensure the auth proxy is running with the correct persisted token.
+ * Called on sandbox connect to recover from host reboots where the
+ * background proxy process was lost, and to detect token divergence
+ * after a failed re-onboard (see issue #2553).
  */
 function ensureOllamaAuthProxy(): void {
   // Try to load persisted token first — if none, this isn't an Ollama setup.
@@ -175,18 +193,23 @@ function ensureOllamaAuthProxy(): void {
   if (!token) return;
 
   const pid = loadPersistedProxyPid();
-  if (isOllamaProxyProcess(pid)) {
+  if (isOllamaProxyProcess(pid) && isProxyTokenValid(token)) {
     ollamaProxyToken = token;
     return;
   }
-
-  // Proxy not running — restart it with the persisted token.
   killStaleProxy();
+
+  // Proxy not running, token mismatch, or PID stale — restart with the persisted token.
   ollamaProxyToken = token;
   spawnOllamaAuthProxy(token);
-  sleep(1);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (isProxyTokenValid(token)) return;
+    sleep(1);
+  }
+  console.error(`  Error: Ollama auth proxy did not become ready after restart.`);
 }
 
+/** Return the current proxy token, falling back to the persisted file. */
 function getOllamaProxyToken(): string | null {
   if (ollamaProxyToken) return ollamaProxyToken;
   // Fall back to persisted token (resume / reconnect scenario)
