@@ -445,7 +445,7 @@ section "Token Divergence Regression (issue #2553)"
 # Simulate a re-onboard that writes a NEW token to the file but
 # leaves the proxy running with the OLD token.
 ORIGINAL_TOKEN=$(cat "$TOKEN_FILE" 2>/dev/null || echo "")
-DIVERGENT_TOKEN="divergent-$(date +%s)-$(head -c 16 /dev/urandom | xxd -p)"
+DIVERGENT_TOKEN="divergent-$(date +%s)-$(node -e 'console.log(require("node:crypto").randomBytes(16).toString("hex"))')"
 
 if [ -n "$ORIGINAL_TOKEN" ]; then
   info "Original token: ${ORIGINAL_TOKEN:0:16}..."

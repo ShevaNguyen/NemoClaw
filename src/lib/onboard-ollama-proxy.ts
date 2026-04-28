@@ -167,18 +167,32 @@ function startOllamaAuthProxy(): boolean {
 
 /**
  * Probe the running proxy to confirm it accepts the given token.
- * Returns true if the proxy responds to an authenticated request.
+ * The proxy validates auth before forwarding to Ollama. A backend error like
+ * 502 still proves the token was accepted, while 401 means token mismatch.
  */
-function isProxyTokenValid(token: string): boolean {
-  const result = spawnSync("curl", [
-    "-sf",
-    "--max-time",
-    "3",
-    "-H",
-    `Authorization: Bearer ${token}`,
-    `http://localhost:${OLLAMA_PROXY_PORT}/v1/models`,
-  ], { encoding: "utf8" });
-  return result.status === 0;
+function probeProxyToken(token: string): "accepted" | "rejected" | "unreachable" {
+  const result = spawnSync(
+    "curl",
+    [
+      "-sS",
+      "-o",
+      "/dev/null",
+      "-w",
+      "%{http_code}",
+      "--max-time",
+      "3",
+      "-H",
+      `Authorization: Bearer ${token}`,
+      `http://localhost:${OLLAMA_PROXY_PORT}/v1/models`,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) return "unreachable";
+
+  const status = String(result.stdout || "").trim();
+  if (status === "401") return "rejected";
+  if (/^\d{3}$/.test(status)) return "accepted";
+  return "unreachable";
 }
 
 /**
@@ -193,17 +207,20 @@ function ensureOllamaAuthProxy(): void {
   if (!token) return;
 
   const pid = loadPersistedProxyPid();
-  if (isOllamaProxyProcess(pid) && isProxyTokenValid(token)) {
-    ollamaProxyToken = token;
-    return;
+  if (isOllamaProxyProcess(pid)) {
+    const tokenStatus = probeProxyToken(token);
+    if (tokenStatus === "accepted") {
+      ollamaProxyToken = token;
+      return;
+    }
   }
   killStaleProxy();
 
   // Proxy not running, token mismatch, or PID stale — restart with the persisted token.
   ollamaProxyToken = token;
-  spawnOllamaAuthProxy(token);
+  const startedPid = spawnOllamaAuthProxy(token);
   for (let attempt = 0; attempt < 10; attempt++) {
-    if (isProxyTokenValid(token)) return;
+    if (isOllamaProxyProcess(startedPid) && probeProxyToken(token) === "accepted") return;
     sleep(1);
   }
   console.error(`  Error: Ollama auth proxy did not become ready after restart.`);
