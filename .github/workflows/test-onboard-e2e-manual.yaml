@@ -1,0 +1,118 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+name: test-onboard-e2e-manual
+on:
+  workflow_dispatch:
+jobs:
+  double-onboard-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install NemoClaw
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: bash install.sh --non-interactive --yes-i-accept-third-party-software
+      - name: Run double onboard E2E
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: |
+          [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
+          export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+          bash test/e2e/test-double-onboard.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: double-onboard-test-log
+          path: test-double-onboard-*.log
+          if-no-files-found: ignore
+  onboard-repair-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install NemoClaw
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: bash install.sh --non-interactive --yes-i-accept-third-party-software
+      - name: Run onboard repair E2E
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: |
+          [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
+          export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+          bash test/e2e/test-onboard-repair.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onboard-repair-test-log
+          path: test-onboard-repair-*.log
+          if-no-files-found: ignore
+  onboard-resume-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install NemoClaw
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: bash install.sh --non-interactive --yes-i-accept-third-party-software
+      - name: Run onboard resume E2E
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: |
+          [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
+          export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+          bash test/e2e/test-onboard-resume.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onboard-resume-test-log
+          path: test-onboard-resume-*.log
+          if-no-files-found: ignore
+  runtime-overrides-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install NemoClaw
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: bash install.sh --non-interactive --yes-i-accept-third-party-software
+      - name: Run runtime overrides E2E
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NEMOCLAW_NON_INTERACTIVE: "1"
+          NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE: "1"
+        run: |
+          [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" 2>/dev/null || true
+          export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+          bash test/e2e/test-runtime-overrides.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-overrides-test-log
+          path: test-runtime-overrides-*.log
+          if-no-files-found: ignore
